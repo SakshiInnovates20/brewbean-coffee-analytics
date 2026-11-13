@@ -1,0 +1,5 @@
+# BrewBean Coffee Analytics System - Core Dependencies
+Flask>=3.0.0
+python-dotenv>=1.0.0
+PyMySQL>=1.1.0
+pytest>=8.0.0

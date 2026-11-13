@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Campaign: {{ campaign.campaign_name }} — BrewBean Coffee{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <!-- Page Header & Action Bar -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <a href="{{ url_for('marketing.list_campaigns') }}" class="btn btn-outline-secondary rounded-pill px-4">
+            <i class="bi bi-arrow-left me-1"></i> Back to Marketing Directory
+        </a>
+        <div class="d-flex gap-2">
+            {% if campaign.status == 'Active' %}
+                <span class="badge bg-success-subtle text-success border border-success rounded-pill px-3 py-2 fs-7"><i class="bi bi-record-fill me-1"></i> Active Campaign</span>
+            {% else %}
+                <span class="badge bg-primary-subtle text-primary border border-primary rounded-pill px-3 py-2 fs-7">{{ campaign.status }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Campaign Header Banner -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-coffee-dark text-white">
+        <div class="row align-items-center g-3">
+            <div class="col-md-8">
+                <div class="badge bg-amber text-dark fw-bold rounded-pill px-3 py-1 mb-2 fs-8">{{ campaign.channel }}</div>
+                <h2 class="fw-bold mb-1">{{ campaign.campaign_name }}</h2>
+                <p class="text-white-50 mb-2"><i class="bi bi-people me-1"></i> Target Audience: {{ campaign.target_audience or 'General Audience' }}</p>
+                <small class="text-amber font-monospace"><i class="bi bi-calendar3 me-1"></i> Duration: {{ campaign.start_date }} to {{ campaign.end_date }}</small>
+            </div>
+            <div class="col-md-4 text-md-end border-start border-secondary ps-md-4">
+                <span class="text-uppercase text-muted-coffee fw-bold fs-8 d-block mb-1">Marketing ROI</span>
+                {% if metrics.roi_percentage is not none %}
+                    {% if metrics.roi_percentage >= 0 %}
+                        <h1 class="display-6 fw-bold text-success mb-0">+{{ metrics.roi_percentage }}%</h1>
+                    {% else %}
+                        <h1 class="display-6 fw-bold text-danger mb-0">{{ metrics.roi_percentage }}%</h1>
+                    {% endif %}
+                {% else %}
+                    <h1 class="display-6 fw-bold text-muted mb-0">N/A</h1>
+                {% endif %}
+                <small class="text-muted-coffee">Attributed Profit vs Actual Spend</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Metrics Cards Grid -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-2">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <span class="text-uppercase text-muted fw-bold fs-8">Budget</span>
+                <h5 class="fw-bold text-coffee-dark mb-0">₹{{ "%.2f"|format(campaign.budget) }}</h5>
+            </div>
+        </div>
+        <div class="col-6 col-lg-2">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <span class="text-uppercase text-muted fw-bold fs-8">Actual Spend</span>
+                <h5 class="fw-bold text-dark mb-0">₹{{ "%.2f"|format(campaign.actual_spend) }}</h5>
+            </div>
+        </div>
+        <div class="col-6 col-lg-2">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <span class="text-uppercase text-muted fw-bold fs-8">Attr. Revenue</span>
+                <h5 class="fw-bold text-coffee-dark mb-0">₹{{ "%.2f"|format(metrics.attributed_revenue) }}</h5>
+            </div>
+        </div>
+        <div class="col-6 col-lg-2">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <span class="text-uppercase text-muted fw-bold fs-8">Attr. Profit</span>
+                <h5 class="fw-bold text-success mb-0">₹{{ "%.2f"|format(metrics.attributed_profit) }}</h5>
+            </div>
+        </div>
+        <div class="col-6 col-lg-2">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <span class="text-uppercase text-muted fw-bold fs-8">Linked Orders</span>
+                <h5 class="fw-bold text-coffee-dark mb-0">{{ metrics.total_orders }}</h5>
+            </div>
+        </div>
+        <div class="col-6 col-lg-2">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <span class="text-uppercase text-muted fw-bold fs-8">Campaign AOV</span>
+                <h5 class="fw-bold text-coffee-dark mb-0">₹{{ "%.2f"|format(metrics.avg_order_value) }}</h5>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attributed Sales Transactions Table Card -->
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-header bg-coffee-dark text-white p-3 d-flex align-items-center justify-content-between">
+            <h5 class="mb-0 fw-bold fs-6"><i class="bi bi-receipt me-2 text-amber"></i> Campaign-Attributed Invoices ({{ linked_sales|length }})</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light border-bottom">
+                    <tr>
+                        <th class="ps-4">Invoice #</th>
+                        <th>Date & Time</th>
+                        <th>Branch</th>
+                        <th>Customer</th>
+                        <th>Order Type</th>
+                        <th>Payment</th>
+                        <th class="text-end">Total Amount</th>
+                        <th class="text-end">Net Profit</th>
+                        <th class="text-end pe-4">Receipt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if linked_sales %}
+                        {% for sale in linked_sales %}
+                            <tr>
+                                <td class="ps-4 font-monospace fw-bold text-coffee-dark">
+                                    <span class="badge bg-dark-subtle text-dark border px-2 py-1">{{ sale.invoice_number }}</span>
+                                </td>
+                                <td><small class="text-secondary">{{ sale.sale_date }}</small></td>
+                                <td class="fw-semibold text-coffee-dark">{{ sale.shop_name }}</td>
+                                <td>{{ sale.customer_name }}</td>
+                                <td><span class="badge bg-info-subtle text-info border border-info rounded-pill px-2 py-1 fs-8">{{ sale.order_type }}</span></td>
+                                <td><small class="fw-semibold">{{ sale.payment_method }}</small></td>
+                                <td class="text-end font-monospace fw-bold text-coffee-dark">₹{{ "%.2f"|format(sale.total_amount) }}</td>
+                                <td class="text-end font-monospace text-success">+₹{{ "%.2f"|format(sale.total_profit) }}</td>
+                                <td class="text-end pe-4">
+                                    <a href="{{ url_for('sales.view_invoice', sale_id=sale.sale_id) }}" class="btn btn-sm btn-outline-dark rounded-pill px-3">
+                                        <i class="bi bi-eye me-1"></i> Receipt
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
+                                No sales transactions have been attributed to this marketing campaign yet.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

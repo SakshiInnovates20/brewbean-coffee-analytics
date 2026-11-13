@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Invoice {{ sale.invoice_number }} — BrewBean Coffee{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <!-- Action Bar (Hidden on Print) -->
+    <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+        <a href="{{ url_for('sales.list_sales') }}" class="btn btn-outline-secondary rounded-pill px-4">
+            <i class="bi bi-arrow-left me-1"></i> Back to Sales Log
+        </a>
+        <div class="d-flex gap-2">
+            <button onclick="window.print()" class="btn btn-amber rounded-pill px-4 fw-semibold shadow-sm">
+                <i class="bi bi-printer me-1"></i> Print Invoice
+            </button>
+        </div>
+    </div>
+
+    <!-- Printable Invoice Card -->
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden p-4 p-md-5 bg-white text-dark printable-invoice">
+        
+        <!-- Header Branding & Invoice Meta -->
+        <div class="row align-items-start border-bottom pb-4 mb-4 g-3">
+            <div class="col-md-7">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <i class="bi bi-cup-hot-fill text-amber fs-2"></i>
+                    <h3 class="fw-bold mb-0 text-coffee-dark">BREWBEAN <span class="text-amber">COFFEE</span></h3>
+                </div>
+                <h6 class="fw-bold text-coffee-dark mb-1">{{ sale.shop_name }}</h6>
+                <p class="text-secondary small mb-0">{{ sale.area or '' }} {{ sale.city }}, India</p>
+                <p class="text-secondary small mb-0">Branch Manager: {{ sale.manager_name or 'Store Manager' }}</p>
+            </div>
+            <div class="col-md-5 text-md-end">
+                <span class="badge bg-amber-subtle text-amber border border-amber rounded-pill px-3 py-1 mb-2 fs-8 fw-bold">TAX INVOICE</span>
+                <h4 class="font-monospace fw-bold text-coffee-dark mb-1">{{ sale.invoice_number }}</h4>
+                <p class="text-secondary small mb-1"><i class="bi bi-calendar3 me-1"></i> {{ sale.sale_date }}</p>
+            </div>
+        </div>
+
+        <!-- Customer & Order Meta Information -->
+        <div class="row g-3 p-3 bg-light rounded-3 mb-4 fs-7">
+            <div class="col-6 col-md-3">
+                <span class="text-muted text-uppercase fw-bold fs-8 d-block">Customer</span>
+                <span class="fw-bold text-coffee-dark">{{ sale.customer_name }}</span>
+            </div>
+            <div class="col-6 col-md-3">
+                <span class="text-muted text-uppercase fw-bold fs-8 d-block">Order Type</span>
+                <span class="badge bg-info-subtle text-info border border-info rounded-pill px-2 py-1">{{ sale.order_type }}</span>
+            </div>
+            <div class="col-6 col-md-3">
+                <span class="text-muted text-uppercase fw-bold fs-8 d-block">Payment Method</span>
+                <span class="fw-semibold text-dark">{{ sale.payment_method }}</span>
+            </div>
+            <div class="col-6 col-md-3">
+                <span class="text-muted text-uppercase fw-bold fs-8 d-block">Payment Status</span>
+                <span class="badge bg-success-subtle text-success border border-success rounded-pill px-2 py-1">PAID</span>
+            </div>
+        </div>
+
+        <!-- Order Line Items Table -->
+        <div class="table-responsive mb-4">
+            <table class="table align-middle">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-3">Item #</th>
+                        <th>Product Description</th>
+                        <th>Category</th>
+                        <th class="text-center">Qty</th>
+                        <th class="text-end">Unit Price</th>
+                        <th class="text-end pe-3">Line Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in sale_items %}
+                        <tr>
+                            <td class="ps-3 font-monospace small text-muted">{{ loop.index }}</td>
+                            <td class="fw-bold text-coffee-dark">{{ item.product_name }}</td>
+                            <td><span class="badge bg-amber-subtle text-amber border px-2 py-1 fs-8">{{ item.category_name }}</span></td>
+                            <td class="text-center font-monospace">{{ item.quantity }}</td>
+                            <td class="text-end font-monospace">₹{{ "%.2f"|format(item.unit_price) }}</td>
+                            <td class="text-end font-monospace fw-bold pe-3">₹{{ "%.2f"|format(item.item_revenue) }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Calculation Summary Footer -->
+        <div class="row align-items-start border-top pt-4">
+            <div class="col-md-6 mb-3 mb-md-0">
+                <div class="p-3 bg-light rounded-3">
+                    <h6 class="fw-bold text-coffee-dark mb-1">Thank you for visiting BrewBean Coffee!</h6>
+                    <small class="text-muted">For corporate feedback or queries, email corporate@brewbeancoffee.com</small>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="ms-auto" style="max-width: 320px;">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-secondary">Subtotal:</span>
+                        <span class="font-monospace fw-semibold">₹{{ "%.2f"|format(sale.subtotal) }}</span>
+                    </div>
+                    {% if sale.discount > 0 %}
+                        <div class="d-flex justify-content-between mb-2 text-danger">
+                            <span>Discount:</span>
+                            <span class="font-monospace">-₹{{ "%.2f"|format(sale.discount) }}</span>
+                        </div>
+                    {% endif %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-secondary">Tax (5%):</span>
+                        <span class="font-monospace">₹{{ "%.2f"|format(sale.tax) }}</span>
+                    </div>
+                    <hr class="my-2">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="h5 fw-bold text-coffee-dark">Grand Total:</span>
+                        <span class="h5 font-monospace fw-bold text-amber">₹{{ "%.2f"|format(sale.total_amount) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between p-2 rounded bg-success-subtle border border-success d-print-none">
+                        <small class="fw-bold text-success">Net Profit:</small>
+                        <small class="font-monospace fw-bold text-success">+₹{{ "%.2f"|format(sale.total_profit) }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Print Stylesheet -->
+<style>
+@media print {
+    body {
+        background-color: #ffffff !important;
+    }
+    .navbar, footer, .d-print-none {
+        display: none !important;
+    }
+    .main-wrapper {
+        padding-top: 0 !important;
+    }
+    .printable-invoice {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+    }
+}
+</style>
+{% endblock %}

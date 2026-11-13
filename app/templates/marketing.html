@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+
+{% block title %}Marketing Campaigns & ROI — BrewBean Coffee{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <!-- Page Header & Action Bar -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <div class="badge bg-amber-subtle text-amber border border-amber rounded-pill px-3 py-1 mb-2 fs-8 fw-bold">
+                <i class="bi bi-megaphone me-1"></i> Campaign Management & Attribution
+            </div>
+            <h2 class="fw-bold text-coffee-dark mb-0">Marketing Analytics</h2>
+            <p class="text-secondary small mb-0">Track advertising campaigns, channel performance, attributed sales, and marketing ROI %.</p>
+        </div>
+
+        <button type="button" class="btn btn-amber rounded-pill px-4 fw-semibold shadow-sm" data-bs-toggle="modal" data-bs-target="#addCampaignModal">
+            <i class="bi bi-plus-circle me-1"></i> Add New Campaign
+        </button>
+    </div>
+
+    <!-- Flash Messages Block -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+                    <i class="bi bi-info-circle-fill me-2"></i> {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Marketing Operational Summary KPI Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-amber-subtle text-amber p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="bi bi-wallet2 fs-4"></i>
+                    </div>
+                    <div>
+                        <span class="text-uppercase text-muted fw-bold fs-8">Total Campaign Spend</span>
+                        <h4 class="fw-bold text-coffee-dark mb-0">₹{{ "%.2f"|format(kpis.total_spend) }}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-primary-subtle text-primary p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="bi bi-graph-up fs-4"></i>
+                    </div>
+                    <div>
+                        <span class="text-uppercase text-muted fw-bold fs-8">Attributed Revenue</span>
+                        <h4 class="fw-bold text-coffee-dark mb-0">₹{{ "%.2f"|format(kpis.total_attributed_revenue) }}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-success-subtle text-success p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="bi bi-cash-stack fs-4"></i>
+                    </div>
+                    <div>
+                        <span class="text-uppercase text-muted fw-bold fs-8">Attributed Profit</span>
+                        <h4 class="fw-bold text-success mb-0">₹{{ "%.2f"|format(kpis.total_attributed_profit) }}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-info-subtle text-info p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="bi bi-percent fs-4"></i>
+                    </div>
+                    <div>
+                        <span class="text-uppercase text-muted fw-bold fs-8">Overall Marketing ROI</span>
+                        <h4 class="fw-bold text-coffee-dark mb-0">
+                            {% if kpis.overall_roi is not none %}
+                                {% if kpis.overall_roi >= 0 %}
+                                    <span class="text-success">+{{ kpis.overall_roi }}%</span>
+                                {% else %}
+                                    <span class="text-danger">{{ kpis.overall_roi }}%</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter & Search Bar -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4 p-3 bg-white">
+        <form method="GET" action="{{ url_for('marketing.list_campaigns') }}" class="row g-3 align-items-center">
+            <div class="col-md-5 col-lg-4">
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="search" class="form-control border-start-0 bg-light" placeholder="Search campaign name, target audience..." value="{{ search_query }}">
+                </div>
+            </div>
+            <div class="col-md-3 col-lg-3">
+                <select name="channel" class="form-select bg-light">
+                    <option value="">All Channels</option>
+                    <option value="Instagram" {% if channel_filter == 'Instagram' %}selected{% endif %}>Instagram</option>
+                    <option value="Facebook" {% if channel_filter == 'Facebook' %}selected{% endif %}>Facebook</option>
+                    <option value="Google Ads" {% if channel_filter == 'Google Ads' %}selected{% endif %}>Google Ads</option>
+                    <option value="WhatsApp" {% if channel_filter == 'WhatsApp' %}selected{% endif %}>WhatsApp</option>
+                    <option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>Email</option>
+                    <option value="Influencer" {% if channel_filter == 'Influencer' %}selected{% endif %}>Influencer</option>
+                    <option value="Offline" {% if channel_filter == 'Offline' %}selected{% endif %}>Offline</option>
+                    <option value="Referral" {% if channel_filter == 'Referral' %}selected{% endif %}>Referral</option>
+                    <option value="Other" {% if channel_filter == 'Other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+            <div class="col-md-2 col-lg-2">
+                <select name="status" class="form-select bg-light">
+                    <option value="">All Statuses</option>
+                    <option value="Planned" {% if status_filter == 'Planned' %}selected{% endif %}>Planned</option>
+                    <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
+                    <option value="Completed" {% if status_filter == 'Completed' %}selected{% endif %}>Completed</option>
+                    <option value="Cancelled" {% if status_filter == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                </select>
+            </div>
+            <div class="col-md-2 col-lg-3 d-flex gap-2">
+                <button type="submit" class="btn btn-dark rounded-pill px-4"><i class="bi bi-funnel me-1"></i> Filter</button>
+                {% if search_query or channel_filter or status_filter %}
+                    <a href="{{ url_for('marketing.list_campaigns') }}" class="btn btn-outline-secondary rounded-pill px-3"><i class="bi bi-x-circle me-1"></i> Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Marketing Campaigns Table Card -->
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-header bg-coffee-dark text-white p-3 d-flex align-items-center justify-content-between">
+            <h5 class="mb-0 fw-bold fs-6"><i class="bi bi-megaphone me-2 text-amber"></i> Advertising Campaigns ({{ campaigns|length }})</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light border-bottom">
+                    <tr>
+                        <th class="ps-4">Campaign Name</th>
+                        <th>Channel</th>
+                        <th>Dates</th>
+                        <th class="text-end">Actual Spend</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-end">Attr. Revenue</th>
+                        <th class="text-end">Attr. Profit</th>
+                        <th class="text-end">Marketing ROI</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if campaigns %}
+                        {% for camp in campaigns %}
+                            <tr>
+                                <td class="ps-4 fw-bold text-coffee-dark">
+                                    <a href="{{ url_for('marketing.view_campaign', campaign_id=camp.campaign_id) }}" class="text-decoration-none text-coffee-dark hover-amber">
+                                        {{ camp.campaign_name }}
+                                    </a>
+                                    <small class="d-block text-muted font-normal fs-8">{{ camp.target_audience or 'General Audience' }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-amber-subtle text-amber border px-2 py-1 fs-8">{{ camp.channel }}</span>
+                                </td>
+                                <td>
+                                    <small class="text-secondary font-monospace">{{ camp.start_date }} → {{ camp.end_date }}</small>
+                                </td>
+                                <td class="text-end font-monospace fw-semibold">₹{{ "%.2f"|format(camp.actual_spend) }}</td>
+                                <td class="text-center">
+                                    {% if camp.status == 'Active' %}
+                                        <span class="badge bg-success-subtle text-success border border-success rounded-pill px-3 py-1 fs-8">Active</span>
+                                    {% elif camp.status == 'Completed' %}
+                                        <span class="badge bg-primary-subtle text-primary border border-primary rounded-pill px-3 py-1 fs-8">Completed</span>
+                                    {% elif camp.status == 'Planned' %}
+                                        <span class="badge bg-info-subtle text-info border border-info rounded-pill px-3 py-1 fs-8">Planned</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary rounded-pill px-3 py-1 fs-8">Cancelled</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end font-monospace fw-bold text-coffee-dark">₹{{ "%.2f"|format(camp.attributed_revenue) }}</td>
+                                <td class="text-end font-monospace text-success">₹{{ "%.2f"|format(camp.attributed_profit) }}</td>
+                                <td class="text-end font-monospace fw-bold">
+                                    {% if camp.roi_percentage is not none %}
+                                        {% if camp.roi_percentage >= 0 %}
+                                            <span class="badge bg-success-subtle text-success border border-success px-2 py-1">+{{ camp.roi_percentage }}%</span>
+                                        {% else %}
+                                            <span class="badge bg-danger-subtle text-danger border border-danger px-2 py-1">{{ camp.roi_percentage }}%</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="badge bg-light text-secondary border px-2 py-1">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end pe-4">
+                                    <div class="d-flex justify-content-end gap-1">
+                                        <a href="{{ url_for('marketing.view_campaign', campaign_id=camp.campaign_id) }}" class="btn btn-sm btn-outline-dark rounded-circle p-1" title="View Campaign Details">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-circle p-1" title="Edit Campaign"
+                                                onclick="openEditCampaignModal('{{ camp.campaign_id }}', '{{ camp.campaign_name|escape }}', '{{ camp.channel }}', '{{ camp.start_date }}', '{{ camp.end_date }}', '{{ camp.budget }}', '{{ camp.actual_spend }}', '{{ camp.target_audience|escape if camp.target_audience else '' }}', '{{ camp.status }}')">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center py-5 text-muted">
+                                <i class="bi bi-megaphone-fill fs-1 d-block mb-2 text-secondary"></i>
+                                No marketing campaigns found matching your filter.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal: Add New Campaign -->
+<div class="modal fade" id="addCampaignModal" tabindex="-1" aria-labelledby="addCampaignModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow">
+            <div class="modal-header bg-coffee-dark text-white rounded-top-4">
+                <h5 class="modal-title fw-bold" id="addCampaignModalLabel"><i class="bi bi-megaphone text-amber me-2"></i> Launch New Campaign</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('marketing.add_campaign') }}">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Campaign Name <span class="text-danger">*</span></label>
+                            <input type="text" name="campaign_name" class="form-control" placeholder="e.g. Festive Coffee Blitz" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Channel <span class="text-danger">*</span></label>
+                            <select name="channel" class="form-select" required>
+                                <option value="Instagram" selected>Instagram</option>
+                                <option value="Facebook">Facebook</option>
+                                <option value="Google Ads">Google Ads</option>
+                                <option value="WhatsApp">WhatsApp</option>
+                                <option value="Email">Email</option>
+                                <option value="Influencer">Influencer</option>
+                                <option value="Offline">Offline</option>
+                                <option value="Referral">Referral</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Status <span class="text-danger">*</span></label>
+                            <select name="status" class="form-select" required>
+                                <option value="Planned" selected>Planned</option>
+                                <option value="Active">Active</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Start Date <span class="text-danger">*</span></label>
+                            <input type="date" name="start_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">End Date <span class="text-danger">*</span></label>
+                            <input type="date" name="end_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Budget (₹)</label>
+                            <input type="number" step="0.01" min="0" name="budget" class="form-control" placeholder="0.00" value="0.00">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Actual Spend (₹)</label>
+                            <input type="number" step="0.01" min="0" name="actual_spend" class="form-control" placeholder="0.00" value="0.00">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Target Audience</label>
+                            <input type="text" name="target_audience" class="form-control" placeholder="e.g. Young professionals & Students">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light rounded-bottom-4">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-amber rounded-pill px-4 fw-semibold">Save Campaign</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Edit Campaign -->
+<div class="modal fade" id="editCampaignModal" tabindex="-1" aria-labelledby="editCampaignModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow">
+            <div class="modal-header bg-coffee-dark text-white rounded-top-4">
+                <h5 class="modal-title fw-bold" id="editCampaignModalLabel"><i class="bi bi-pencil-square text-amber me-2"></i> Edit Campaign</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editCampaignForm" method="POST" action="">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Campaign Name <span class="text-danger">*</span></label>
+                            <input type="text" id="edit_campaign_name" name="campaign_name" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Channel <span class="text-danger">*</span></label>
+                            <select id="edit_channel" name="channel" class="form-select" required>
+                                <option value="Instagram">Instagram</option>
+                                <option value="Facebook">Facebook</option>
+                                <option value="Google Ads">Google Ads</option>
+                                <option value="WhatsApp">WhatsApp</option>
+                                <option value="Email">Email</option>
+                                <option value="Influencer">Influencer</option>
+                                <option value="Offline">Offline</option>
+                                <option value="Referral">Referral</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Status <span class="text-danger">*</span></label>
+                            <select id="edit_status" name="status" class="form-select" required>
+                                <option value="Planned">Planned</option>
+                                <option value="Active">Active</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Start Date <span class="text-danger">*</span></label>
+                            <input type="date" id="edit_start_date" name="start_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">End Date <span class="text-danger">*</span></label>
+                            <input type="date" id="edit_end_date" name="end_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Budget (₹)</label>
+                            <input type="number" step="0.01" min="0" id="edit_budget" name="budget" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Actual Spend (₹)</label>
+                            <input type="number" step="0.01" min="0" id="edit_actual_spend" name="actual_spend" class="form-control">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Target Audience</label>
+                            <input type="text" id="edit_target_audience" name="target_audience" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light rounded-bottom-4">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-amber rounded-pill px-4 fw-semibold">Update Campaign</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openEditCampaignModal(id, name, channel, sDate, eDate, budget, spend, audience, status) {
+    document.getElementById('editCampaignForm').action = '/marketing/edit/' + id;
+    document.getElementById('edit_campaign_name').value = name;
+    document.getElementById('edit_channel').value = channel;
+    document.getElementById('edit_start_date').value = sDate;
+    document.getElementById('edit_end_date').value = eDate;
+    document.getElementById('edit_budget').value = budget;
+    document.getElementById('edit_actual_spend').value = spend;
+    document.getElementById('edit_target_audience').value = audience;
+    document.getElementById('edit_status').value = status;
+    
+    const editModal = new bootstrap.Modal(document.getElementById('editCampaignModal'));
+    editModal.show();
+}
+</script>
+{% endblock %}

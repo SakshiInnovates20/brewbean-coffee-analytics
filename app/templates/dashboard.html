@@ -1,0 +1,553 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics Dashboard — BrewBean Coffee{% endblock %}
+
+{% block content %}
+<!-- Include Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<div class="container py-4">
+
+    <!-- Dashboard Title & Dataset Date Range -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <div class="badge bg-amber-subtle text-amber border border-amber rounded-pill px-3 py-1 mb-2 fs-8 fw-bold">
+                <i class="bi bi-graph-up-arrow me-1"></i> Executive Analytics & Intelligence
+            </div>
+            <h2 class="fw-bold text-coffee-dark mb-0">Multi-Branch Analytics Dashboard</h2>
+            <p class="text-secondary small mb-0">Real-time revenue, profit margins, branch comparisons, menu performance, and campaign ROI.</p>
+        </div>
+
+        {% if date_range_info and date_range_info.min_date %}
+            <div class="card border-0 shadow-sm bg-white rounded-pill px-4 py-2 text-md-end">
+                <small class="text-uppercase text-muted fw-bold fs-8 d-block">Available Data Range</small>
+                <span class="font-monospace fw-bold text-coffee-dark fs-7"><i class="bi bi-calendar-range text-amber me-1"></i> {{ date_range_info.min_date }} → {{ date_range_info.max_date }}</span>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Flash Messages Block -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+                    <i class="bi bi-info-circle-fill me-2"></i> {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Global Filter Header Bar -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4 p-3 bg-white">
+        <form method="GET" action="{{ url_for('dashboard.render_dashboard') }}" class="row g-3 align-items-center">
+            <div class="col-6 col-md-3 col-lg-2">
+                <label class="form-label text-muted fs-8 text-uppercase fw-bold mb-1">Start Date</label>
+                <input type="date" name="start_date" class="form-control form-control-sm bg-light" value="{{ filters.start_date or '' }}">
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+                <label class="form-label text-muted fs-8 text-uppercase fw-bold mb-1">End Date</label>
+                <input type="date" name="end_date" class="form-control form-control-sm bg-light" value="{{ filters.end_date or '' }}">
+            </div>
+            <div class="col-md-3 col-lg-3">
+                <label class="form-label text-muted fs-8 text-uppercase fw-bold mb-1">Branch</label>
+                <select name="shop_id" class="form-select form-select-sm bg-light">
+                    <option value="">All Store Branches</option>
+                    {% for shop in shops %}
+                        <option value="{{ shop.shop_id }}" {% if filters.shop_id == (shop.shop_id|string) %}selected{% endif %}>{{ shop.shop_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 col-lg-2">
+                <label class="form-label text-muted fs-8 text-uppercase fw-bold mb-1">Product Category</label>
+                <select name="category_id" class="form-select form-select-sm bg-light">
+                    <option value="">All Categories</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat.category_id }}" {% if filters.category_id == (cat.category_id|string) %}selected{% endif %}>{{ cat.category_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 col-lg-1">
+                <label class="form-label text-muted fs-8 text-uppercase fw-bold mb-1">Order Type</label>
+                <select name="order_type" class="form-select form-select-sm bg-light">
+                    <option value="">All Types</option>
+                    <option value="Dine-in" {% if filters.order_type == 'Dine-in' %}selected{% endif %}>Dine-in</option>
+                    <option value="Takeaway" {% if filters.order_type == 'Takeaway' %}selected{% endif %}>Takeaway</option>
+                    <option value="Delivery" {% if filters.order_type == 'Delivery' %}selected{% endif %}>Delivery</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-lg-2 d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-dark btn-sm rounded-pill px-3 w-100"><i class="bi bi-filter me-1"></i> Apply</button>
+                <a href="{{ url_for('dashboard.render_dashboard') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-2"><i class="bi bi-arrow-counterclockwise"></i></a>
+            </div>
+        </form>
+    </div>
+
+    <!-- 6 Main KPI Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-2">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div class="d-flex align-items-center gap-2 mb-1 text-amber">
+                    <i class="bi bi-currency-rupee fs-5"></i>
+                    <span class="text-uppercase text-muted fw-bold fs-8">Total Revenue</span>
+                </div>
+                <h4 class="fw-bold text-coffee-dark mb-0">₹{{ "%.2f"|format(kpis.total_revenue) }}</h4>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-2">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div class="d-flex align-items-center gap-2 mb-1 text-success">
+                    <i class="bi bi-graph-up-arrow fs-5"></i>
+                    <span class="text-uppercase text-muted fw-bold fs-8">Total Profit</span>
+                </div>
+                <h4 class="fw-bold text-success mb-0">₹{{ "%.2f"|format(kpis.total_profit) }}</h4>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-2">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div class="d-flex align-items-center gap-2 mb-1 text-primary">
+                    <i class="bi bi-receipt-cutoff fs-5"></i>
+                    <span class="text-uppercase text-muted fw-bold fs-8">Total Orders</span>
+                </div>
+                <h4 class="fw-bold text-coffee-dark mb-0">{{ kpis.total_orders }}</h4>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-2">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div class="d-flex align-items-center gap-2 mb-1 text-info">
+                    <i class="bi bi-calculator fs-5"></i>
+                    <span class="text-uppercase text-muted fw-bold fs-8">Avg Order Value</span>
+                </div>
+                <h4 class="fw-bold text-coffee-dark mb-0">₹{{ "%.2f"|format(kpis.avg_order_value) }}</h4>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-2">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div class="d-flex align-items-center gap-2 mb-1 text-warning">
+                    <i class="bi bi-percent fs-5"></i>
+                    <span class="text-uppercase text-muted fw-bold fs-8">Profit Margin %</span>
+                </div>
+                <h4 class="fw-bold text-coffee-dark mb-0">{{ kpis.profit_margin_pct }}%</h4>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-2">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div class="d-flex align-items-center gap-2 mb-1 text-purple">
+                    <i class="bi bi-people fs-5"></i>
+                    <span class="text-uppercase text-muted fw-bold fs-8">Unique Customers</span>
+                </div>
+                <h4 class="fw-bold text-coffee-dark mb-0">{{ kpis.total_customers }}</h4>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rule-Based Business Insights Section -->
+    {% if insights %}
+        <div class="card border-0 shadow-sm rounded-4 mb-4 bg-amber-subtle border-start border-4 border-amber p-4">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <i class="bi bi-lightbulb-fill text-amber fs-4"></i>
+                <h5 class="fw-bold text-coffee-dark mb-0">Automated Data Insights</h5>
+            </div>
+            <div class="row g-3">
+                {% for ins in insights %}
+                    <div class="col-md-6">
+                        <div class="p-3 bg-white rounded-3 shadow-xs h-100 fs-7 text-dark">
+                            {{ ins|safe }}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Chart Row 1: Sales Revenue & Profit Trend (Line Chart) -->
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-coffee-dark mb-0"><i class="bi bi-graph-up me-2 text-amber"></i> Sales Revenue & Profit Trend</h5>
+                    <span class="badge bg-light text-secondary border rounded-pill px-3 py-1 fs-8">Daily Aggregation</span>
+                </div>
+                <div style="height: 320px;">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Row 2: Branch Performance & Category Breakdown -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
+                <h5 class="fw-bold text-coffee-dark mb-3"><i class="bi bi-shop me-2 text-amber"></i> Revenue by Store Branch</h5>
+                <div style="height: 280px;">
+                    <canvas id="branchChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
+                <h5 class="fw-bold text-coffee-dark mb-3"><i class="bi bi-pie-chart me-2 text-amber"></i> Sales by Product Category</h5>
+                <div style="height: 280px;" class="d-flex align-items-center justify-content-center">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Row 3: Top 10 Products & Order Types -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
+                <h5 class="fw-bold text-coffee-dark mb-3"><i class="bi bi-cup-straw me-2 text-amber"></i> Top 10 Products by Revenue</h5>
+                <div style="height: 300px;">
+                    <canvas id="productChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
+                <h5 class="fw-bold text-coffee-dark mb-3"><i class="bi bi-bag-check me-2 text-amber"></i> Orders by Order Type</h5>
+                <div style="height: 300px;" class="d-flex align-items-center justify-content-center">
+                    <canvas id="orderTypeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Row 4: Payment Methods & Customer Segments -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
+                <h5 class="fw-bold text-coffee-dark mb-3"><i class="bi bi-credit-card me-2 text-amber"></i> Payment Method Distribution</h5>
+                <div style="height: 260px;">
+                    <canvas id="paymentChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
+                <h5 class="fw-bold text-coffee-dark mb-3"><i class="bi bi-people me-2 text-amber"></i> Revenue by Customer Segment</h5>
+                <div style="height: 260px;">
+                    <canvas id="customerSegmentChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Row 5: Top Marketing Campaigns Performance -->
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+                <h5 class="fw-bold text-coffee-dark mb-3"><i class="bi bi-megaphone me-2 text-amber"></i> Top Marketing Campaign Performance</h5>
+                <div style="height: 280px;">
+                    <canvas id="campaignChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Analytics Tables Grid -->
+    <div class="row g-4 mb-4">
+        
+        <!-- Table 1: Branch Performance Table -->
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden h-100">
+                <div class="card-header bg-coffee-dark text-white p-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-shop me-2 text-amber"></i> Branch Financial Performance Summary</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-3">Branch</th>
+                                <th class="text-end">Revenue</th>
+                                <th class="text-end">Profit</th>
+                                <th class="text-center">Orders</th>
+                                <th class="text-end">AOV</th>
+                                <th class="text-end pe-3">Margin %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for b in branch_perf %}
+                                <tr>
+                                    <td class="ps-3 fw-bold text-coffee-dark">{{ b.shop_name }}</td>
+                                    <td class="text-end font-monospace fw-bold">₹{{ "%.2f"|format(b.total_revenue) }}</td>
+                                    <td class="text-end font-monospace text-success">₹{{ "%.2f"|format(b.total_profit) }}</td>
+                                    <td class="text-center font-monospace">{{ b.total_invoices }}</td>
+                                    <td class="text-end font-monospace">₹{{ "%.2f"|format(b.avg_order_value) }}</td>
+                                    <td class="text-end font-monospace pe-3"><span class="badge bg-amber-subtle text-amber border px-2 py-1">{{ b.profit_margin_pct }}%</span></td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table 2: Top Customers Table -->
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden h-100">
+                <div class="card-header bg-coffee-dark text-white p-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-trophy me-2 text-amber"></i> Top Registered Customers</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-3">Customer</th>
+                                <th>Type</th>
+                                <th class="text-center">Orders</th>
+                                <th class="text-end pe-3">Total Spend</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cus in top_customers %}
+                                <tr>
+                                    <td class="ps-3 fw-bold text-coffee-dark">{{ cus.name }}</td>
+                                    <td><span class="badge bg-primary-subtle text-primary border px-2 py-1 fs-8">{{ cus.customer_type }}</span></td>
+                                    <td class="text-center font-monospace">{{ cus.total_orders }}</td>
+                                    <td class="text-end font-monospace fw-bold pe-3 text-success">₹{{ "%.2f"|format(cus.total_revenue) }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table 3: Monthly Historical Performance Table -->
+        <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-header bg-coffee-dark text-white p-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-calendar-month me-2 text-amber"></i> Monthly Historical Breakdown</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Month</th>
+                                <th class="text-end">Revenue</th>
+                                <th class="text-end">Net Profit</th>
+                                <th class="text-center">Total Orders</th>
+                                <th class="text-end">Average Order Value</th>
+                                <th class="text-end pe-4">Profit Margin %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in monthly_perf %}
+                                <tr>
+                                    <td class="ps-4 fw-bold text-coffee-dark">{{ m.month_name }}</td>
+                                    <td class="text-end font-monospace fw-bold text-coffee-dark">₹{{ "%.2f"|format(m.total_revenue) }}</td>
+                                    <td class="text-end font-monospace text-success">₹{{ "%.2f"|format(m.total_profit) }}</td>
+                                    <td class="text-center font-monospace">{{ m.total_orders }}</td>
+                                    <td class="text-end font-monospace">₹{{ "%.2f"|format(m.avg_order_value) }}</td>
+                                    <td class="text-end font-monospace pe-4"><span class="badge bg-success-subtle text-success border border-success px-2 py-1">{{ m.profit_margin_pct }}%</span></td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Chart.js Payload Initializations -->
+<script>
+    // Theme Colors
+    const colorAmber = '#D97706';
+    const colorCoffeeDark = '#2B1810';
+    const colorSuccess = '#10B981';
+    const colorPrimary = '#3B82F6';
+    const colorPurple = '#8B5CF6';
+    const colorRose = '#F43F5E';
+
+    // 1. Sales Trend Line Chart
+    const ctxTrend = document.getElementById('trendChart').getContext('2d');
+    new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+            labels: {{ chart_trend_labels|tojson }},
+            datasets: [
+                {
+                    label: 'Revenue (₹)',
+                    data: {{ chart_trend_revenue|tojson }},
+                    borderColor: colorAmber,
+                    backgroundColor: 'rgba(217, 119, 6, 0.1)',
+                    fill: true,
+                    tension: 0.3
+                },
+                {
+                    label: 'Net Profit (₹)',
+                    data: {{ chart_trend_profit|tojson }},
+                    borderColor: colorSuccess,
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    fill: true,
+                    tension: 0.3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'top' } }
+        }
+    });
+
+    // 2. Branch Revenue Bar Chart
+    const ctxBranch = document.getElementById('branchChart').getContext('2d');
+    new Chart(ctxBranch, {
+        type: 'bar',
+        data: {
+            labels: {{ chart_branch_labels|tojson }},
+            datasets: [{
+                label: 'Revenue (₹)',
+                data: {{ chart_branch_revenue|tojson }},
+                backgroundColor: [colorAmber, colorCoffeeDark, colorPrimary, colorSuccess, colorPurple, colorRose],
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // 3. Category Sales Doughnut Chart
+    const ctxCategory = document.getElementById('categoryChart').getContext('2d');
+    new Chart(ctxCategory, {
+        type: 'doughnut',
+        data: {
+            labels: {{ chart_cat_labels|tojson }},
+            datasets: [{
+                data: {{ chart_cat_revenue|tojson }},
+                backgroundColor: [colorAmber, colorPrimary, colorSuccess, colorPurple, colorRose, '#64748B']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'right' } }
+        }
+    });
+
+    // 4. Top 10 Products Horizontal Bar Chart
+    const ctxProduct = document.getElementById('productChart').getContext('2d');
+    new Chart(ctxProduct, {
+        type: 'bar',
+        indexAxis: 'y',
+        data: {
+            labels: {{ chart_prod_labels|tojson }},
+            datasets: [{
+                label: 'Revenue (₹)',
+                data: {{ chart_prod_revenue|tojson }},
+                backgroundColor: colorAmber,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // 5. Order Types Doughnut Chart
+    const ctxOrderType = document.getElementById('orderTypeChart').getContext('2d');
+    new Chart(ctxOrderType, {
+        type: 'doughnut',
+        data: {
+            labels: {{ chart_order_type_labels|tojson }},
+            datasets: [{
+                data: {{ chart_order_type_counts|tojson }},
+                backgroundColor: [colorPrimary, colorAmber, colorPurple]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'right' } }
+        }
+    });
+
+    // 6. Payment Method Bar Chart
+    const ctxPayment = document.getElementById('paymentChart').getContext('2d');
+    new Chart(ctxPayment, {
+        type: 'bar',
+        data: {
+            labels: {{ chart_payment_labels|tojson }},
+            datasets: [{
+                label: 'Orders Count',
+                data: {{ chart_payment_counts|tojson }},
+                backgroundColor: colorPrimary,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // 7. Customer Segment Bar Chart
+    const ctxCustomer = document.getElementById('customerSegmentChart').getContext('2d');
+    new Chart(ctxCustomer, {
+        type: 'bar',
+        data: {
+            labels: {{ chart_customer_labels|tojson }},
+            datasets: [{
+                label: 'Revenue (₹)',
+                data: {{ chart_customer_revenue|tojson }},
+                backgroundColor: colorPurple,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // 8. Campaign Performance Bar Chart
+    const ctxCampaign = document.getElementById('campaignChart').getContext('2d');
+    new Chart(ctxCampaign, {
+        type: 'bar',
+        data: {
+            labels: {{ chart_camp_labels|tojson }},
+            datasets: [
+                {
+                    label: 'Attributed Revenue (₹)',
+                    data: {{ chart_camp_revenue|tojson }},
+                    backgroundColor: colorAmber,
+                    borderRadius: 6
+                },
+                {
+                    label: 'Attributed Profit (₹)',
+                    data: {{ chart_camp_profit|tojson }},
+                    backgroundColor: colorSuccess,
+                    borderRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'top' } }
+        }
+    });
+</script>
+{% endblock %}

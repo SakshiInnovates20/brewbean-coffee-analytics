@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block title %}POS Sales Entry — BrewBean Coffee{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <!-- Page Header & Action Bar -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <div class="badge bg-amber-subtle text-amber border border-amber rounded-pill px-3 py-1 mb-2 fs-8 fw-bold">
+                <i class="bi bi-cart-plus me-1"></i> Point of Sale Counter
+            </div>
+            <h2 class="fw-bold text-coffee-dark mb-0">Create New Sales Invoice</h2>
+            <p class="text-secondary small mb-0">Select branch, customer, add menu items, apply discounts, and generate transactions.</p>
+        </div>
+
+        <a href="{{ url_for('sales.list_sales') }}" class="btn btn-outline-secondary rounded-pill px-4 fw-semibold">
+            <i class="bi bi-arrow-left me-1"></i> Back to Sales Log
+        </a>
+    </div>
+
+    <!-- Flash Messages Block -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+                    <i class="bi bi-info-circle-fill me-2"></i> {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form id="posForm" method="POST" action="{{ url_for('sales.new_sale') }}">
+        <div class="row g-4">
+            
+            <!-- Left Panel: Transaction Header & Line Items -->
+            <div class="col-lg-8">
+                
+                <!-- Transaction Header Details Card -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-header bg-coffee-dark text-white p-3">
+                        <h5 class="mb-0 fw-bold fs-6"><i class="bi bi-info-circle me-2 text-amber"></i> Order & Customer Details</h5>
+                    </div>
+                    <div class="card-body p-4 bg-white">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Store Branch <span class="text-danger">*</span></label>
+                                <select name="shop_id" class="form-select" required>
+                                    <option value="" disabled selected>Select Branch</option>
+                                    {% for shop in shops %}
+                                        <option value="{{ shop.shop_id }}">{{ shop.shop_code }} — {{ shop.shop_name }} ({{ shop.city }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Customer</label>
+                                <select name="customer_id" class="form-select">
+                                    <option value="" selected>Walk-in Customer</option>
+                                    {% for cus in customers %}
+                                        <option value="{{ cus.customer_id }}">{{ cus.customer_code }} — {{ cus.name }} ({{ cus.customer_type }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Order Type <span class="text-danger">*</span></label>
+                                <select name="order_type" class="form-select" required>
+                                    <option value="Dine-in" selected>Dine-in</option>
+                                    <option value="Takeaway">Takeaway</option>
+                                    <option value="Delivery">Delivery</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Payment Method <span class="text-danger">*</span></label>
+                                <select name="payment_method" class="form-select" required>
+                                    <option value="UPI" selected>UPI</option>
+                                    <option value="Cash">Cash</option>
+                                    <option value="Credit Card">Credit Card</option>
+                                    <option value="Debit Card">Debit Card</option>
+                                    <option value="Wallet">Wallet</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Marketing Campaign</label>
+                                <select name="campaign_id" class="form-select">
+                                    <option value="" selected>No Campaign / Organic Sale</option>
+                                    {% for camp in campaigns %}
+                                        <option value="{{ camp.campaign_id }}">{{ camp.campaign_name }} ({{ camp.channel }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Line Items Card -->
+                <div class="card border-0 shadow-sm rounded-4">
+                    <div class="card-header bg-coffee-dark text-white p-3 d-flex align-items-center justify-content-between">
+                        <h5 class="mb-0 fw-bold fs-6"><i class="bi bi-cart3 me-2 text-amber"></i> Order Line Items</h5>
+                        <button type="button" class="btn btn-amber btn-sm rounded-pill px-3 fw-semibold" onclick="addProductRow()">
+                            <i class="bi bi-plus-circle me-1"></i> Add Product Row
+                        </button>
+                    </div>
+                    <div class="card-body p-0 bg-white">
+                        <div class="table-responsive">
+                            <table class="table align-middle mb-0" id="itemsTable">
+                                <thead class="bg-light border-bottom">
+                                    <tr>
+                                        <th style="min-width: 200px;" class="ps-4">Product Item</th>
+                                        <th style="width: 100px;">Qty</th>
+                                        <th style="width: 110px;" class="text-end">Unit Price</th>
+                                        <th style="width: 110px;" class="text-end">Line Revenue</th>
+                                        <th style="width: 110px;" class="text-end">Line Profit</th>
+                                        <th style="width: 60px;" class="text-center pe-4">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="itemsTableBody">
+                                    <!-- Dynamic Rows Inserted Here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Panel: Invoice Calculation & Summary -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm rounded-4 position-sticky" style="top: 90px;">
+                    <div class="card-header bg-coffee-dark text-white p-3">
+                        <h5 class="mb-0 fw-bold fs-6"><i class="bi bi-calculator me-2 text-amber"></i> Invoice Summary</h5>
+                    </div>
+                    <div class="card-body p-4 bg-white">
+                        <div class="mb-3">
+                            <label class="form-label text-muted fs-8 text-uppercase fw-bold mb-1">Generated Invoice #</label>
+                            <input type="text" class="form-control font-monospace fw-bold bg-light" value="{{ next_invoice }}" readonly>
+                        </div>
+
+                        <hr class="my-3">
+
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-secondary">Subtotal (Items):</span>
+                            <span class="fw-bold text-coffee-dark" id="dispSubtotal">₹0.00</span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-secondary small mb-1">Discount (₹ INR Amount):</label>
+                            <input type="number" step="0.01" min="0" name="discount" id="inputDiscount" class="form-control text-end" value="0.00" oninput="recalculateTotals()">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-secondary small mb-1">Tax Percentage (%):</label>
+                            <input type="number" step="0.1" min="0" max="100" name="tax_percentage" id="inputTaxPct" class="form-control text-end" value="5.0" oninput="recalculateTotals()">
+                        </div>
+
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-secondary">Calculated Tax Amount:</span>
+                            <span class="fw-bold text-dark" id="dispTax">₹0.00</span>
+                        </div>
+
+                        <hr class="my-3">
+
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="h6 fw-bold text-coffee-dark">Grand Total Amount:</span>
+                            <span class="h5 fw-bold text-amber" id="dispGrandTotal">₹0.00</span>
+                        </div>
+
+                        <div class="d-flex justify-content-between p-2 rounded-3 bg-success-subtle border border-success mb-4">
+                            <span class="fs-8 fw-bold text-success">Estimated Net Profit:</span>
+                            <span class="fs-8 fw-bold text-success" id="dispTotalProfit">₹0.00</span>
+                        </div>
+
+                        <button type="submit" class="btn btn-amber rounded-pill w-100 py-3 fw-bold fs-6 shadow">
+                            <i class="bi bi-check-circle-fill me-2"></i> Complete & Print Invoice
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </form>
+</div>
+
+<!-- Product Data JSON for JS calculations -->
+<script>
+    const productsCatalog = {
+        {% for p in products %}
+            "{{ p.product_id }}": {
+                "name": {{ p.product_name|tojson }},
+                "price": {{ p.selling_price|float }},
+                "cost": {{ p.cost_price|float }}
+            }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Add default product row on page load
+        addProductRow();
+    });
+
+    function addProductRow() {
+        const tbody = document.getElementById('itemsTableBody');
+        const rowId = 'row_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+
+        let selectOptions = '<option value="" disabled selected>Select Product</option>';
+        for (const [id, prod] of Object.entries(productsCatalog)) {
+            selectOptions += `<option value="${id}">${prod.name} (₹${prod.price.toFixed(2)})</option>`;
+        }
+
+        const tr = document.createElement('tr');
+        tr.id = rowId;
+        tr.innerHTML = `
+            <td class="ps-4">
+                <select name="product_ids[]" class="form-select form-select-sm product-select" required onchange="onProductChange('${rowId}')">
+                    ${selectOptions}
+                </select>
+            </td>
+            <td>
+                <input type="number" min="1" value="1" name="quantities[]" class="form-control form-select-sm qty-input" required oninput="recalculateRow('${rowId}')">
+            </td>
+            <td class="text-end font-monospace small unit-price-text">₹0.00</td>
+            <td class="text-end font-monospace fw-bold line-rev-text">₹0.00</td>
+            <td class="text-end font-monospace small text-success line-profit-text">₹0.00</td>
+            <td class="text-center pe-4">
+                <button type="button" class="btn btn-sm btn-outline-danger rounded-circle p-1" onclick="removeProductRow('${rowId}')">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    function removeProductRow(rowId) {
+        const tbody = document.getElementById('itemsTableBody');
+        if (tbody.children.length <= 1) {
+            alert('At least one product line item is required.');
+            return;
+        }
+        const tr = document.getElementById(rowId);
+        if (tr) tr.remove();
+        recalculateTotals();
+    }
+
+    function onProductChange(rowId) {
+        recalculateRow(rowId);
+    }
+
+    function recalculateRow(rowId) {
+        const tr = document.getElementById(rowId);
+        if (!tr) return;
+
+        const select = tr.querySelector('.product-select');
+        const qtyInput = tr.querySelector('.qty-input');
+        const priceText = tr.querySelector('.unit-price-text');
+        const revText = tr.querySelector('.line-rev-text');
+        const profitText = tr.querySelector('.line-profit-text');
+
+        const pid = select.value;
+        const qty = parseInt(qtyInput.value) || 1;
+
+        if (pid && productsCatalog[pid]) {
+            const prod = productsCatalog[pid];
+            const price = prod.price;
+            const cost = prod.cost;
+
+            const lineRevenue = qty * price;
+            const lineCost = qty * cost;
+            const lineProfit = lineRevenue - lineCost;
+
+            priceText.textContent = '₹' + price.toFixed(2);
+            revText.textContent = '₹' + lineRevenue.toFixed(2);
+            profitText.textContent = '₹' + lineProfit.toFixed(2);
+        } else {
+            priceText.textContent = '₹0.00';
+            revText.textContent = '₹0.00';
+            profitText.textContent = '₹0.00';
+        }
+
+        recalculateTotals();
+    }
+
+    function recalculateTotals() {
+        let subtotal = 0;
+        let totalCost = 0;
+
+        const rows = document.querySelectorAll('#itemsTableBody tr');
+        rows.forEach(tr => {
+            const select = tr.querySelector('.product-select');
+            const qtyInput = tr.querySelector('.qty-input');
+            const pid = select.value;
+            const qty = parseInt(qtyInput.value) || 0;
+
+            if (pid && productsCatalog[pid]) {
+                const prod = productsCatalog[pid];
+                subtotal += (qty * prod.price);
+                totalCost += (qty * prod.cost);
+            }
+        });
+
+        const discountInput = parseFloat(document.getElementById('inputDiscount').value) || 0;
+        const taxPctInput = parseFloat(document.getElementById('inputTaxPct').value) || 0;
+
+        const discount = Math.min(discountInput, subtotal);
+        const taxableAmount = Math.max(0, subtotal - discount);
+        const taxAmount = (taxableAmount * taxPctInput) / 100.0;
+        const grandTotal = taxableAmount + taxAmount;
+        const totalProfit = grandTotal - totalCost;
+
+        document.getElementById('dispSubtotal').textContent = '₹' + subtotal.toFixed(2);
+        document.getElementById('dispTax').textContent = '₹' + taxAmount.toFixed(2);
+        document.getElementById('dispGrandTotal').textContent = '₹' + grandTotal.toFixed(2);
+        document.getElementById('dispTotalProfit').textContent = '₹' + totalProfit.toFixed(2);
+    }
+</script>
+{% endblock %}
