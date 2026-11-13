@@ -13,12 +13,11 @@ An end-to-end **sales and marketing analytics system** for a 6-branch coffee cha
 
 ## 📸 Dashboard Preview
 
-![BrewBean analytics dashboard](screenshots/dashboard.png)
+![BrewBean analytics dashboard](Screenshot%20%28390%29.png)
 
 | POS Sales Entry | Marketing Campaign ROI |
 |---|---|
-| ![Sales entry](screenshots/sales_entry.png) | ![Marketing ROI](screenshots/marketing.png) |
-
+| ![Sales entry](Screenshot%20%28397%29.png) | ![Marketing ROI](Screenshot%20%28400%29.png) |
 ---
 
 ## 💡 What This Project Demonstrates
